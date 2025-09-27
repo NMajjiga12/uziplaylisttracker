@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UZI Leaks Database Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>UZI Leaks Database Tracker</h1>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3>Current Songs</h3>
+                    <span id="current-count">{{ stats.current }}</span>
+                </div>
+                <div class="stat-card">
+                    <h3>All Songs</h3>
+                    <span id="all-count">{{ stats.all }}</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Removed Songs</h3>
+                    <span id="removed-count">{{ stats.removed }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Bar Section -->
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search songs by title or artist..." class="search-input">
+                <button id="search-btn" class="search-button">Search</button>
+                <button id="clear-search" class="clear-search-button">Clear</button>
+            </div>
+            <div id="search-info" class="search-info"></div>
+        </div>
+
+        <div class="controls">
+            <div class="button-group">
+                <button class="tab-button active" data-collection="current">Current Songs</button>
+                <button class="tab-button" data-collection="all">All Songs</button>
+                <button class="tab-button" data-collection="removed">Removed Songs</button>
+            </div>
+            <div class="update-section">
+                <button id="update-btn" class="update-button">Update Database</button>
+                <div id="update-status" class="status-message"></div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="songs-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Artist</th>
+                        <th>Duration</th>
+                        <th>Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody id="songs-tbody">
+                    <!-- Songs will be loaded here dynamically -->
+                </tbody>
+            </table>
+            
+            <div class="pagination">
+                <button id="prev-btn" class="pagination-btn">Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-btn" class="pagination-btn">Next</button>
+            </div>
+            
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span>Loading songs...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
