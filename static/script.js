@@ -4,12 +4,13 @@ class UziDatabaseApp {
         this.currentPage = 1;
         this.perPage = 50;
         this.totalPages = 1;
-        this.updateInterval = null;
         this.currentSearchQuery = '';
+        this.autoUpdateInterval = null;
         
         this.initializeEventListeners();
         this.loadSongs(this.currentCollection, this.currentPage);
         this.updateStats();
+        this.startAutoUpdateMonitoring();
     }
     
     initializeEventListeners() {
@@ -20,9 +21,13 @@ class UziDatabaseApp {
             });
         });
         
-        // Update button
-        document.getElementById('update-btn').addEventListener('click', () => {
-            this.updateDatabase();
+        // Auto-update controls
+        document.getElementById('trigger-update').addEventListener('click', () => {
+            this.triggerManualUpdate();
+        });
+        
+        document.getElementById('refresh-status').addEventListener('click', () => {
+            this.updateAutoUpdateStatus();
         });
         
         // Pagination buttons
@@ -57,6 +62,124 @@ class UziDatabaseApp {
         });
     }
     
+    startAutoUpdateMonitoring() {
+        // Update auto-update status every 30 seconds
+        this.updateAutoUpdateStatus();
+        this.autoUpdateInterval = setInterval(() => {
+            this.updateAutoUpdateStatus();
+        }, 30000); // 30 seconds
+    }
+    
+    async updateAutoUpdateStatus() {
+        try {
+            const response = await fetch('/api/auto-update/status');
+            const status = await response.json();
+            
+            if (response.ok) {
+                this.displayAutoUpdateStatus(status);
+            } else {
+                console.error('Error fetching auto-update status:', status.error);
+            }
+        } catch (error) {
+            console.error('Error fetching auto-update status:', error);
+        }
+    }
+    
+    displayAutoUpdateStatus(status) {
+        document.getElementById('auto-update-status').textContent = 
+            status.enabled ? 'Active' : 'Disabled';
+        document.getElementById('auto-update-interval').textContent = 
+            `${status.interval_minutes} minutes`;
+        document.getElementById('last-update').textContent = 
+            status.last_update ? new Date(status.last_update).toLocaleString() : 'Never';
+        document.getElementById('next-update').textContent = 
+            status.next_update ? new Date(status.next_update).toLocaleString() : 'Calculating...';
+        
+        // Update status indicator
+        const statusElement = document.getElementById('auto-update-status');
+        if (status.in_progress) {
+            statusElement.innerHTML = '🔄 Updating...';
+            statusElement.style.color = '#ffa500'; // Orange
+        } else if (status.enabled) {
+            statusElement.innerHTML = '✅ Active';
+            statusElement.style.color = '#4CAF50'; // Green
+        } else {
+            statusElement.innerHTML = '❌ Disabled';
+            statusElement.style.color = '#F44336'; // Red
+        }
+    }
+    
+    async triggerManualUpdate() {
+        const triggerBtn = document.getElementById('trigger-update');
+        const originalText = triggerBtn.textContent;
+        
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = 'Triggering...';
+        
+        try {
+            const response = await fetch('/api/auto-update/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification('Update triggered successfully!', 'success');
+                // Refresh status after a short delay
+                setTimeout(() => this.updateAutoUpdateStatus(), 2000);
+            } else {
+                throw new Error(result.error || 'Failed to trigger update');
+            }
+        } catch (error) {
+            console.error('Error triggering update:', error);
+            this.showNotification('Error: ' + error.message, 'error');
+        } finally {
+            triggerBtn.disabled = false;
+            triggerBtn.textContent = originalText;
+        }
+    }
+    
+    showNotification(message, type) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        
+        // Add styles
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        `;
+        
+        if (type === 'success') {
+            notification.style.background = '#4CAF50';
+        } else {
+            notification.style.background = '#F44336';
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => notification.style.opacity = '1', 100);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+    
     switchCollection(collection) {
         this.currentCollection = collection;
         this.currentPage = 1;
@@ -85,15 +208,22 @@ class UziDatabaseApp {
             }
             
             const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
             
-            if (response.ok) {
-                this.displaySongs(data.songs);
-                this.updatePagination(data);
-                this.updateSearchInfo(data);
-            } else {
-                throw new Error(data.error || 'Failed to load songs');
+            if (data.error) {
+                throw new Error(data.error);
             }
+            
+            this.displaySongs(data.songs);
+            this.updatePagination(data);
+            this.updateSearchInfo(data);
+            
         } catch (error) {
             console.error('Error loading songs:', error);
             this.displayError('Failed to load songs: ' + error.message);
@@ -127,7 +257,7 @@ class UziDatabaseApp {
         tbody.innerHTML = '';
         
         if (songs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px;">No songs found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No songs found</td></tr>';
             return;
         }
         
@@ -135,8 +265,10 @@ class UziDatabaseApp {
             const row = document.createElement('tr');
             
             row.innerHTML = `
+                <td>${song.track_number || ''}</td>
                 <td>${this.escapeHtml(song.title)}</td>
                 <td>${this.escapeHtml(song.artist)}</td>
+                <td>${this.escapeHtml(song.album || '')}</td>
                 <td>${this.formatDuration(song.duration_seconds)}</td>
                 <td>${song.last_updated || 'N/A'}</td>
             `;
@@ -171,69 +303,6 @@ class UziDatabaseApp {
         }
     }
     
-    async updateDatabase() {
-        const updateBtn = document.getElementById('update-btn');
-        const statusEl = document.getElementById('update-status');
-        
-        updateBtn.disabled = true;
-        statusEl.textContent = 'Updating database...';
-        statusEl.className = 'status-message info';
-        
-        try {
-            const response = await fetch('/api/update', { method: 'POST' });
-            const data = await response.json();
-            
-            if (response.ok) {
-                statusEl.textContent = 'Update started. Please wait...';
-                this.startUpdatePolling();
-            } else {
-                throw new Error(data.error || 'Failed to start update');
-            }
-        } catch (error) {
-            console.error('Error starting update:', error);
-            statusEl.textContent = 'Error: ' + error.message;
-            statusEl.className = 'status-message error';
-            updateBtn.disabled = false;
-        }
-    }
-    
-    startUpdatePolling() {
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-        }
-        
-        this.updateInterval = setInterval(async () => {
-            try {
-                const response = await fetch('/api/update-status');
-                const status = await response.json();
-                
-                const statusEl = document.getElementById('update-status');
-                const updateBtn = document.getElementById('update-btn');
-                
-                if (!status.in_progress) {
-                    clearInterval(this.updateInterval);
-                    updateBtn.disabled = false;
-                    
-                    if (status.last_result) {
-                        statusEl.textContent = status.message;
-                        statusEl.className = 'status-message success';
-                        
-                        // Update stats and reload current view
-                        this.updateStats();
-                        this.loadSongs(this.currentCollection, this.currentPage, this.currentSearchQuery);
-                    } else {
-                        statusEl.textContent = status.message;
-                        statusEl.className = 'status-message error';
-                    }
-                } else {
-                    statusEl.textContent = status.message;
-                }
-            } catch (error) {
-                console.error('Error polling update status:', error);
-            }
-        }, 2000);
-    }
-    
     async updateStats() {
         try {
             const response = await fetch('/api/stats');
@@ -254,7 +323,7 @@ class UziDatabaseApp {
     
     displayError(message) {
         const tbody = document.getElementById('songs-tbody');
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ff6b6b; padding: 40px;">${message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ff6b6b; padding: 40px;">${message}</td></tr>`;
     }
     
     escapeHtml(text) {

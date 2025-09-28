@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UZI Leaks Database Tracker</title>
+    <title>UZI Leaks Database Tracker - Auto Update</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -26,6 +26,43 @@
             </div>
         </header>
 
+        <!-- Auto-Update Status Section -->
+        <div class="auto-update-section">
+            <div class="auto-update-card">
+                <h3>🔄 Auto-Update System</h3>
+                <div class="auto-update-status">
+                    <div class="status-item">
+                        <span class="label">Status:</span>
+                        <span class="value" id="auto-update-status">
+                            {% if auto_update_status.enabled %}Active{% else %}Disabled{% endif %}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Interval:</span>
+                        <span class="value" id="auto-update-interval">
+                            {{ auto_update_status.interval_minutes }} minutes
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Last Update:</span>
+                        <span class="value" id="last-update">
+                            {{ auto_update_status.last_update|format_datetime }}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Next Update:</span>
+                        <span class="value" id="next-update">
+                            {{ auto_update_status.next_update|format_datetime }}
+                        </span>
+                    </div>
+                </div>
+                <div class="auto-update-controls">
+                    <button id="trigger-update" class="update-button">Trigger Update Now</button>
+                    <button id="refresh-status" class="refresh-button">Refresh Status</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Search Bar Section -->
         <div class="search-section">
             <div class="search-container">
@@ -42,18 +79,16 @@
                 <button class="tab-button" data-collection="all">All Songs</button>
                 <button class="tab-button" data-collection="removed">Removed Songs</button>
             </div>
-            <div class="update-section">
-                <button id="update-btn" class="update-button">Update Database</button>
-                <div id="update-status" class="status-message"></div>
-            </div>
         </div>
 
         <div class="table-container">
             <table id="songs-table">
                 <thead>
                     <tr>
+                        <th>Track #</th>
                         <th>Title</th>
                         <th>Artist</th>
+                        <th>Album</th>
                         <th>Duration</th>
                         <th>Last Updated</th>
                     </tr>
